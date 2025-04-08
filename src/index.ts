@@ -63,7 +63,7 @@ interface QdrantSearchResult {
 type FeatureExtractionPipeline = (texts: string | string[], options?: { pooling?: "none" | "mean" | "cls"; normalize?: boolean }) => Promise<any>; // 出力型はモデル依存のためany
 
 // --- 設定 ---
-const DEFAULT_QDRANT_URL = 'http://ubuntu-3090:6333'; // デフォルトURLを定数化
+const DEFAULT_QDRANT_URL = 'http://localhost:6333'; // デフォルトURLを定数化
 const DEFAULT_BASE_COLLECTION_NAME = 'docs-collection'; // デフォルト名を定数化
 const DEFAULT_EMBEDDING_MODEL = 'Xenova/all-MiniLM-L6-v2'; // デフォルトモデル名を定数化
 const VECTOR_SIZE = 384;
@@ -344,6 +344,27 @@ class Indexer {
         this.embeddingPipeline = embeddingPipeline; // グローバルスコープのものを参照
     }
 
+    /**
+     * Checks if the collection already exists in Qdrant.
+     * @returns {Promise<boolean>} True if the collection exists, false otherwise.
+     * @throws Will throw an error if the check fails for reasons other than 404.
+     */
+    public async checkCollectionExists(): Promise<boolean> {
+        try {
+            await this.qdrantClient.getCollection(this.collectionName);
+            log('info', `Collection '${this.collectionName}' found.`);
+            return true;
+        } catch (error: any) {
+            if (error.status === 404 || error.message?.includes('Not found')) {
+                log('info', `Collection '${this.collectionName}' not found.`);
+                return false;
+            } else {
+                log('error', `Failed to check collection status for '${this.collectionName}': ${error.message}`);
+                throw error; // Re-throw unexpected errors
+            }
+        }
+    }
+
     private _chunkText(text: string, url: string, title: string): Chunk[] {
         const chunks: Chunk[] = [];
         let start = 0;
@@ -558,20 +579,34 @@ async function main() {
     const argv = await yargs(hideBin(process.argv))
         .scriptName("qdrant_mcp_server_ts")
         .usage('$0 <start_url> [options]')
-        .command('$0 <start_url>', 'Scrape site, index to Qdrant, run MCP server', (y) => {
-            y.positional('start_url', {
-                describe: 'The starting URL of the website to scrape',
-                type: 'string',
-            });
+        // start_url を positional から option に変更し、必須ではなくす
+        .option('start-url', { // positional から option に変更
+            alias: 's', // 短縮エイリアスを追加 (任意)
+            type: 'string',
+            describe: 'The starting URL of the website to scrape (overrides DOCS_URL env var)',
         })
         .option('limit', { alias: 'l', type: 'number', default: DEFAULT_SCRAPE_LIMIT, describe: `Max pages (default: ${DEFAULT_SCRAPE_LIMIT})` })
         .option('match', { alias: 'm', type: 'array', describe: "URL path patterns (prefix match)", default: [] })
         .option('force-reindex', { type: 'boolean', default: false, describe: 'Force re-indexing' })
-        .option('collection-name', { alias: 'c', type: 'string', describe: 'Base name for the Qdrant collection' })
-        .option('qdrant-url', { type: 'string', describe: 'URL of the Qdrant instance' })
-        .option('embedding-model', { type: 'string', describe: 'Name of the embedding model to use' })
+        // 環境変数をデフォルト値として使用
+        .option('collection-name', {
+            alias: 'c',
+            type: 'string',
+            default: process.env.COLLECTION_NAME || DEFAULT_BASE_COLLECTION_NAME,
+            describe: 'Base name for the Qdrant collection (overrides COLLECTION_NAME env var)'
+        })
+        .option('qdrant-url', {
+            type: 'string',
+            default: process.env.QDRANT_URL || DEFAULT_QDRANT_URL,
+            describe: 'URL of the Qdrant instance (overrides QDRANT_URL env var)'
+        })
+        .option('embedding-model', {
+            type: 'string',
+            default: process.env.EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL,
+            describe: 'Name of the embedding model to use (overrides EMBEDDING_MODEL env var)'
+        })
         .option('debug', { type: 'boolean', default: false, describe: 'Enable debug logging' }) // Add debug flag
-        .demandCommand(1, 'You must provide the start_url.')
+        // .demandCommand(1, 'You must provide the start_url.') // 必須ではなくなったので削除
         .help().alias('h', 'help').strict()
         .argv;
 
@@ -579,17 +614,25 @@ async function main() {
     // yargsの引数を安全に処理
     const rawArgs = argv as Record<string, unknown>;
     const args = {
-        start_url: String(rawArgs.start_url || ''),
+        // start_url は positional ではなくなったので、rawArgs['start-url'] を参照
+        start_url: String(rawArgs['start-url'] || process.env.DOCS_URL || ''), // オプション > 環境変数 > デフォルト空文字
         limit: Number(rawArgs.limit || DEFAULT_SCRAPE_LIMIT),
         match: Array.isArray(rawArgs.match) ? rawArgs.match.map(String) : [],
         forceReindex: Boolean(rawArgs.forceReindex || rawArgs["force-reindex"]),
-        collectionName: String(rawArgs.collectionName || process.env.COLLECTION_NAME || DEFAULT_BASE_COLLECTION_NAME), // オプション > 環境変数 > デフォルト
-        qdrantUrl: String(rawArgs.qdrantUrl || process.env.QDRANT_URL || DEFAULT_QDRANT_URL), // オプション > 環境変数 > デフォルト
-        embeddingModel: String(rawArgs.embeddingModel || process.env.EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL), // オプション > 環境変数 > デフォルト
+        // yargs の default で環境変数を考慮済みなので、ここでは rawArgs の値のみ参照
+        collectionName: String(rawArgs.collectionName),
+        qdrantUrl: String(rawArgs.qdrantUrl),
+        embeddingModel: String(rawArgs.embeddingModel),
         debug: Boolean(rawArgs.debug), // Get debug flag value
         _: Array.isArray(rawArgs._) ? rawArgs._ as (string | number)[] : [] as (string | number)[],
         $0: String(rawArgs.$0 || '')
     };
+
+    // start_url の必須チェック (環境変数も考慮)
+    if (!args.start_url) {
+        log('error', 'Error: start-url argument or DOCS_URL environment variable must be provided.');
+        process.exit(1);
+    }
 
     // Set global debug flag based on parsed args
     isDebugEnabled = args.debug;
@@ -629,17 +672,38 @@ async function main() {
     // Indexer インスタンスを作成
     const indexer = new Indexer(collectionName, args.qdrantUrl); // qdrantUrl も渡す
 
-    // --- スクレイピングとインデックス作成 ---
+    // --- スクレイピングとインデックス作成 (条件付き実行) ---
     log('info', `Starting setup for site: ${validatedUrl}`);
     log('info', `Using Qdrant collection: ${collectionName}`);
-    const scraper = new Scraper(validatedUrl, args.limit, args.match);
-    const documents = await scraper.scrape();
-    if (documents?.length > 0) {
-        await indexer.indexDocuments(documents, args.forceReindex);
+
+    let shouldIndex = true; // デフォルトではインデックス作成を行う
+    if (!args.forceReindex) {
+        try {
+            const collectionExists = await indexer.checkCollectionExists();
+            if (collectionExists) {
+                log('info', `Collection '${collectionName}' already exists and force-reindex is not specified. Skipping scraping and indexing.`);
+                shouldIndex = false;
+            }
+        } catch (error) {
+            log('error', `Failed to check collection existence: ${error}. Proceeding with indexing attempt.`);
+            // エラーが発生した場合でも、インデックス作成を試みる (あるいはここで終了させるか)
+        }
     } else {
-        log('warn', "No documents scraped, skipping indexing.");
+        log('info', "'force-reindex' specified, proceeding with scraping and indexing.");
     }
-    log('info', "Setup and indexing phase complete.");
+
+    if (shouldIndex) {
+        const scraper = new Scraper(validatedUrl, args.limit, args.match);
+        const documents = await scraper.scrape();
+        if (documents?.length > 0) {
+            await indexer.indexDocuments(documents, args.forceReindex); // forceReindex は indexDocuments 内でも考慮されるが、明示的に渡す
+        } else {
+            log('warn', "No documents scraped, skipping indexing.");
+        }
+        log('info', "Scraping and indexing phase complete.");
+    } else {
+        log('info', "Setup phase complete (indexing skipped).");
+    }
 
     // --- MCPサーバー設定 ---
     // 元の Server クラスを使用し、capabilities を指定
