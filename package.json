@@ -1,18 +1,17 @@
 {
-  "name": "mcp-qdrant-docs",
-  "version": "1.0.0",
+  "name": "@kazuph/mcp-qdrant-docs",
+  "version": "0.8.0",
   "description": "An MCP server that scrapes websites, indexes content into Qdrant, and provides a query tool.",
-  "private": true,
   "type": "module",
   "bin": {
     "mcp-qdrant-docs": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc && chmod +x dist/index.js",
-    "start": "node dist/index.js",
     "dev": "node --loader ts-node/esm src/index.ts"
   },
   "dependencies": {
@@ -46,5 +45,26 @@
       "protobufjs",
       "sharp"
     ]
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "qdrant",
+    "vector-database",
+    "semantic-search",
+    "rag",
+    "documentation",
+    "scraping",
+    "cli"
+  ],
+  "author": "kazuph",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kazuph/mcp-qdrant-docs.git"
+  },
+  "homepage": "https://github.com/kazuph/mcp-qdrant-docs#readme",
+  "bugs": {
+    "url": "https://github.com/kazuph/mcp-qdrant-docs/issues"
   }
 }

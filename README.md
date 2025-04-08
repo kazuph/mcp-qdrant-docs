@@ -2,45 +2,20 @@
 
 A Model Context Protocol server
 
-This is a TypeScript-based MCP server that implements a simple notes system. It demonstrates core MCP concepts by providing:
-
-- Resources representing text notes with URIs and metadata
-- Tools for creating new notes
-- Prompts for generating summaries of notes
+This is a TypeScript-based MCP server that scrapes website content, indexes it into a Qdrant vector database, and provides a tool to answer questions about the indexed content.
 
 ## Features
 
-### Resources
-- List and access notes via `note://` URIs
-- Each note has a title, content and metadata
-- Plain text mime type for simple content access
-
-### Tools
-- `create_note` - Create new text notes
-  - Takes title and content as required parameters
-  - Stores note in server state
-
-### Prompts
-- `summarize_notes` - Generate a summary of all stored notes
-  - Includes all note contents as embedded resources
-  - Returns structured prompt for LLM summarization
-
-## Development
-
-Install dependencies:
-```bash
-npm install
-```
-
-Build the server:
-```bash
-npm run build
-```
-
-For development with auto-rebuild:
-```bash
-npm run watch
-```
+### Tool: `ask_<sanitized_hostname>_content`
+- **Name:** Dynamically generated based on the `DOCS_URL` or `--start-url` (e.g., `ask_reactrouter_com_content`).
+- **Functionality:** Allows users to ask natural language questions about the content scraped from the specified website.
+- **Process:**
+    1. On startup (or if `force-reindex` is specified), the server scrapes the target website.
+    2. The scraped content is processed, chunked, and embedded using a sentence transformer model.
+    3. These embeddings and content chunks are stored in a Qdrant collection specific to the website.
+    4. When the tool is called with a query, the server embeds the query, searches Qdrant for relevant chunks, and returns the found content as the answer.
+- **Input:** A natural language query (string).
+- **Output:** Text containing the relevant content chunks found in the Qdrant index.
 
 ## Installation
 
@@ -49,22 +24,79 @@ To use with Claude Desktop, add the server config:
 On MacOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
 
+### Using `npx`
+
+The recommended way to run this server is using `npx` within your MCP client configuration (e.g., Claude Desktop's `claude_desktop_config.json`). This avoids the need for global installation.
+
+**Example `claude_desktop_config.json` using `npx`:**
+
 ```json
 {
   "mcpServers": {
-    "mcp-qdrant-docs": {
-      "command": "/path/to/mcp-qdrant-docs/build/index.js"
+    "react-router-docs": { // A unique name for this server instance
+      "command": "npx",
+      "args": [
+        "mcp-qdrant-docs", // The command registered in package.json bin
+        // Optional: Add command-line arguments here if needed
+        // "--start-url", "https://some-default-url.com/",
+        // "--debug"
+      ],
+      // Optional: Set environment variables for configuration
+      "env": {
+        "DOCS_URL": "https://reactrouter.com/",
+        "QDRANT_URL": "http://your-qdrant-instance:6333",
+        "COLLECTION_NAME": "react-router-docs", // Base name for the collection
+        "EMBEDDING_MODEL": "sentence-transformers/all-MiniLM-L6-v2"
+        // "DEBUG": "true" // Alternative way to enable debug logging
+      }
     }
+    // You can add more server instances for different documentation sites here
   }
 }
 ```
 
-### Debugging
+**Configuration Priority:**
 
-Since MCP servers communicate over stdio, debugging can be challenging. We recommend using the [MCP Inspector](https://github.com/modelcontextprotocol/inspector), which is available as a package script:
+The server uses the following priority for settings:
 
-```bash
-npm run inspector
+1.  **Command-line arguments:** (e.g., `--start-url`, `--collection-name`) - Highest priority.
+2.  **Environment variables:** (e.g., `DOCS_URL`, `COLLECTION_NAME`) - Used if command-line arguments are not provided.
+3.  **Default values:** (Defined within the code) - Lowest priority.
+
+## Example: Adding React Router Documentation
+
+To add a server instance specifically for querying React Router documentation, add the following entry to your `mcpServers` configuration (e.g., in `claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    // ... other servers ...
+    "react-router-docs": {
+      "command": "npx", // Or the direct path if not installed globally
+      "args": [
+        "mcp-qdrant-docs"
+        // No need to specify --start-url etc. if using env vars
+      ],
+      "env": {
+        "DOCS_URL": "https://reactrouter.com/",
+        "QDRANT_URL": "http://your-qdrant-instance:6333", // Replace with your Qdrant URL
+        "COLLECTION_NAME": "react-router-docs", // Base name, will become 'react-router-docs-reactrouter_com'
+        "EMBEDDING_MODEL": "sentence-transformers/all-MiniLM-L6-v2" // Or your preferred model
+        // "DEBUG": "true" // Enable debug logs if needed
+      }
+    }
+    // ... other servers ...
+  }
+}
+
 ```
 
-The Inspector will provide a URL to access debugging tools in your browser.
+**Resulting Tool:**
+
+Once this server instance is running and connected to your MCP client, it will provide a tool named similar to `ask_reactrouter_com_content`.
+
+-   **Tool Name:** `ask_<sanitized_hostname>_content` (e.g., `ask_reactrouter_com_content`)
+-   **Description:** Ask a question about the content of the site specified by `DOCS_URL` (or `--start-url`).
+-   **Input:** A natural language query about the documentation.
+
+The server will automatically scrape the site (if the collection doesn't exist or `--force-reindex` is used), index the content into the specified Qdrant collection (`react-router-docs-reactrouter_com` in this example), and then use the index to answer your queries via the provided tool.
