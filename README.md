@@ -55,6 +55,49 @@ The recommended way to run this server is using `npx` within your MCP client con
 }
 ```
 
+## Command-Line Options
+
+When running the server directly (e.g., using `npx mcp-qdrant-docs` or `npm run dev --`), you can use the following command-line options. These options override corresponding environment variables if both are set.
+
+-   `--start-url <url>` or `-s <url>`:
+    -   **Required (if `DOCS_URL` env var is not set).**
+    -   The starting URL of the website to scrape.
+    -   Overrides the `DOCS_URL` environment variable.
+-   `--limit <number>` or `-l <number>`:
+    -   Maximum number of pages to scrape.
+    -   Default: `100`.
+-   `--match <pattern>` or `-m <pattern>`:
+    -   URL path patterns (prefix match) to limit scraping. Can be specified multiple times.
+    -   Example: `--match /docs/ --match /api/`
+    -   Default: Scrapes all pages under the `start-url` domain.
+-   `--force-reindex`:
+    -   Force re-scraping and re-indexing even if the Qdrant collection already exists.
+    -   Default: `false`.
+-   `--collection-name <name>` or `-c <name>`:
+    -   Base name for the Qdrant collection. The final collection name will be `<base_name>-<sanitized_hostname>`.
+    -   Overrides the `COLLECTION_NAME` environment variable.
+    -   Default: `docs-collection`.
+-   `--qdrant-url <url>`:
+    -   URL of the Qdrant instance.
+    -   Overrides the `QDRANT_URL` environment variable.
+    -   Default: `http://localhost:6333`.
+-   `--embedding-model <model_name>`:
+    -   Name of the sentence transformer model to use for embeddings (from Hugging Face or local).
+    -   Overrides the `EMBEDDING_MODEL` environment variable.
+    -   Default: `Xenova/all-MiniLM-L6-v2`.
+-   `--debug`:
+    -   Enable detailed debug logging.
+    -   Overrides the `DEBUG` environment variable (if set to `true`).
+    -   Default: `false`.
+-   `--help` or `-h`:
+    -   Show the help message listing all options.
+
+**Example using command-line options:**
+
+```bash
+npx mcp-qdrant-docs --start-url https://example-docs.com/ --collection-name my-docs --limit 50 --debug
+```
+
 **Configuration Priority:**
 
 The server uses the following priority for settings:

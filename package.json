@@ -11,7 +11,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc && chmod +x dist/index.js",
+    "build": "tsc && echo '#!/usr/bin/env node' | cat - dist/index.js > temp && mv temp dist/index.js && chmod +x dist/index.js",
     "dev": "node --loader ts-node/esm src/index.ts"
   },
   "dependencies": {
@@ -66,5 +66,8 @@
   "homepage": "https://github.com/kazuph/mcp-qdrant-docs#readme",
   "bugs": {
     "url": "https://github.com/kazuph/mcp-qdrant-docs/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
