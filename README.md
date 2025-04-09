@@ -4,10 +4,18 @@ A Model Context Protocol server
 
 This is a TypeScript-based MCP server that scrapes website content, indexes it into a Qdrant vector database, and provides a tool to answer questions about the indexed content.
 
+## 使用例
+
+```
+ask_hono_docs: Hono.devのドキュメント内容について質問できます
+ask_reactrouter_docs: ReactRouter.comのドキュメント内容について質問できます
+ask_gradio_docs: Gradio.appのLLMsドキュメントについて質問できます
+```
+
 ## Features
 
-### Tool: `ask_<sanitized_hostname>_content`
-- **Name:** Dynamically generated based on the `DOCS_URL` or `--start-url` (e.g., `ask_reactrouter_com_content`).
+### Tool: `ask_<doc name>_docs`
+- **Name:** Dynamically generated based on the `DOCS_URL` or `--start-url` (e.g., `ask_reactrouter_docs`).
 - **Functionality:** Allows users to ask natural language questions about the content scraped from the specified website.
 - **Process:**
     1. On startup (or if `force-reindex` is specified), the server scrapes the target website.
@@ -23,6 +31,10 @@ To use with Claude Desktop, add the server config:
 
 On MacOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
+
+```
+npm i -g @kazuph/mcp-qdrant-docs
+```
 
 ### Using `npx`
 
@@ -136,10 +148,10 @@ To add a server instance specifically for querying React Router documentation, a
 
 **Resulting Tool:**
 
-Once this server instance is running and connected to your MCP client, it will provide a tool named similar to `ask_reactrouter_com_content`.
+Once this server instance is running and connected to your MCP client, it will provide a tool named similar to `ask_reactrouter_docs` (not `ask_reactrouter_com_docs`).
 
--   **Tool Name:** `ask_<sanitized_hostname>_content` (e.g., `ask_reactrouter_com_content`)
+-   **Tool Name:** `ask_<doc name>_docs` (e.g., `ask_reactrouter_docs`)
 -   **Description:** Ask a question about the content of the site specified by `DOCS_URL` (or `--start-url`).
 -   **Input:** A natural language query about the documentation.
 
-The server will automatically scrape the site (if the collection doesn't exist or `--force-reindex` is used), index the content into the specified Qdrant collection (`react-router-docs-reactrouter_com` in this example), and then use the index to answer your queries via the provided tool.
+The server will automatically scrape the site (if the collection doesn't exist or `--force-reindex` is used), index the content into the specified Qdrant collection (`react-router-docs-reactrouter_com` in this example), and then use the index to answer your queries via the provided tool (`ask_reactrouter_docs`).

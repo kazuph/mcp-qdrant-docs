@@ -735,7 +735,7 @@ async function main() {
     );
 
     // --- ツール定義 ---
-    const toolName = `ask_${sanitizedSiteName}_content`;
+    const toolName = `ask_${sanitizedSiteName}_docs`;
     const toolDescription = `Ask a question about the content of the site ${validatedUrl}. Input is your natural language query.`;
 
     // ListTools ハンドラ: 提供するツールをリストアップ (元の形式に戻す)
