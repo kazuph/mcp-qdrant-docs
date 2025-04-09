@@ -3,9 +3,7 @@
   "version": "0.8.3",
   "description": "An MCP server that scrapes websites, indexes content into Qdrant, and provides a query tool.",
   "type": "module",
-  "bin": {
-    "mcp-qdrant-docs": "./dist/index.js"
-  },
+  "bin": "./dist/index.js",
   "files": [
     "dist",
     "README.md"
