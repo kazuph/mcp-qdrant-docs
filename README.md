@@ -36,7 +36,7 @@ The recommended way to run this server is using `npx` within your MCP client con
     "react-router-docs": { // A unique name for this server instance
       "command": "npx",
       "args": [
-        "mcp-qdrant-docs", // The command registered in package.json bin
+        "@kazuph/mcp-qdrant-docs", // The command registered in package.json bin
         // Optional: Add command-line arguments here if needed
         // "--start-url", "https://some-default-url.com/",
         // "--debug"
@@ -95,7 +95,7 @@ When running the server directly (e.g., using `npx mcp-qdrant-docs` or `npm run 
 **Example using command-line options:**
 
 ```bash
-npx mcp-qdrant-docs --start-url https://example-docs.com/ --collection-name my-docs --limit 50 --debug
+npx @kazuph/mcp-qdrant-docs --start-url https://example-docs.com/ --collection-name my-docs --limit 50 --debug
 ```
 
 **Configuration Priority:**
@@ -117,7 +117,7 @@ To add a server instance specifically for querying React Router documentation, a
     "react-router-docs": {
       "command": "npx", // Or the direct path if not installed globally
       "args": [
-        "mcp-qdrant-docs"
+        "@kazuph/mcp-qdrant-docs"
         // No need to specify --start-url etc. if using env vars
       ],
       "env": {
