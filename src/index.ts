@@ -73,7 +73,7 @@ const DEFAULT_SCRAPE_LIMIT = 300;
 const CHUNK_SIZE = 500;
 const CHUNK_OVERLAP = 50;
 const SCRAPE_CONCURRENCY = 3; // 同時実行数を減らす
-const USER_AGENT = 'QdrantMCPServerNodeTS/1.0 (+[https://example.com/botinfo](https://example.com/botinfo))';
+const USER_AGENT = 'QdrantMCPServerNodeTS/1.0';
 
 // --- ロガー設定 (削除) ---
 // const logger: Logger = pino.default(...); // ログ出力を削除
@@ -189,15 +189,12 @@ class Scraper {
         }
     }
 
-    private async _fetchPage(url: string): Promise<string | null> {
+    private async _fetchPage(url: string): Promise<{ html: string | null, contentType: string | null }> {
         try {
             const response = await this.axiosInstance.get<string>(url, { responseType: 'text' });
             const contentType = response.headers['content-type'] || '';
-            if (!contentType.toLowerCase().includes('text/html')) {
-                log('warn', `Skipping non-HTML content at ${url} (Content-Type: ${contentType})`);
-                return null;
-            }
-            return response.data;
+            // HTML以外のチェックは _extractContentAndLinks に移動
+            return { html: response.data, contentType: contentType };
         } catch (error) {
             // axios エラーの詳細を出力
             if (axios.isAxiosError(error)) {
@@ -217,13 +214,29 @@ class Scraper {
             } else {
                  log('error', `Non-Axios error fetching ${url}:`, error); // Axios以外のエラーも詳細出力
             }
-            return null;
+            return { html: null, contentType: null };
         }
     }
 
-    private _extractContentAndLinks(htmlContent: string, url: string): { contentInfo: PageInfo; links: string[] } {
+    private _extractContentAndLinks(htmlContent: string, url: string, contentType: string | null): { contentInfo: PageInfo; links: string[] } { // contentType を追加
         let contentInfo: PageInfo = { url: url, title: "N/A", content: "" };
         let links = new Set<string>();
+
+        // Content-Type が text/html を含まない場合の処理を追加
+        if (contentType && !contentType.toLowerCase().includes('text/html')) {
+            log('info', `Processing as plain text: ${url} (Content-Type: ${contentType})`);
+            contentInfo.content = htmlContent.trim(); // テキスト全体をコンテンツとする
+            // タイトルをURLのパスの最後の部分から取得しようと試みる
+            try {
+                const pathParts = new URL(url).pathname.split('/');
+                contentInfo.title = pathParts.pop() || pathParts.pop() || url; // 最後 or 最後から2番目 or URL全体
+            } catch {
+                contentInfo.title = url; // URLパース失敗時はURL全体
+            }
+            return { contentInfo, links: [] }; // リンク抽出はスキップ
+        }
+
+        // --- ここから下は既存のHTML処理ロジック ---
 
         try {
             const dom = new JSDOM(htmlContent, { url: url });
@@ -236,6 +249,7 @@ class Scraper {
                 // Cheerio の text() は非推奨ではないが、型定義が不完全な場合がある
                 contentInfo.content = $content('body').text().replace(/\s\s+/g, '\n').trim(); // より良いテキスト抽出
 
+                // リンク抽出はHTMLの場合のみ行う
                 const $original = cheerio.load(htmlContent);
                 $original('a[href]').each((i, el) => {
                     const href = $original(el).attr('href');
@@ -248,6 +262,7 @@ class Scraper {
                 });
             } else {
                  log('warn', `Readability could not parse content from ${url}`);
+                 // Readability が失敗した場合もリンク抽出を行う
                  const $original = cheerio.load(htmlContent);
                  contentInfo.title = $original('title').first().text().trim() || 'N/A';
                  $original('a[href]').each((i, el) => {
@@ -286,10 +301,10 @@ class Scraper {
 
             log('info', `[Queue: ${this.queue.size}/${this.queue.pending}] Scraping: ${url}`);
             this.visitedUrls.add(url);
-            const html = await this._fetchPage(url);
+            const pageData = await this._fetchPage(url); // 変更
 
-            if (html) {
-                const { contentInfo, links } = this._extractContentAndLinks(html, url);
+            if (pageData?.html) { // 変更
+                const { contentInfo, links } = this._extractContentAndLinks(pageData.html, url, pageData.contentType); // 変更: contentType を渡す
                 if (contentInfo.content?.trim()) {
                     this.processedPages.push(contentInfo);
                     this.scrapedCount++;

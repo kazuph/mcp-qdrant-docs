@@ -1,6 +1,6 @@
 {
   "name": "@kazuph/mcp-qdrant-docs",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "An MCP server that scrapes websites, indexes content into Qdrant, and provides a query tool.",
   "type": "module",
   "bin": {
@@ -24,6 +24,7 @@
     "jsdom": "^24.1.0",
     "p-queue": "^7.4.1",
     "pino": "^9.1.0",
+    "sharp": "^0.34.1",
     "yargs": "^17.7.2",
     "zod": "^3.23.8"
   },
