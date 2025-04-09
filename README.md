@@ -65,7 +65,7 @@ When running the server directly (e.g., using `npx mcp-qdrant-docs` or `npm run 
     -   Overrides the `DOCS_URL` environment variable.
 -   `--limit <number>` or `-l <number>`:
     -   Maximum number of pages to scrape.
-    -   Default: `100`.
+    -   Default: `300`.
 -   `--match <pattern>` or `-m <pattern>`:
     -   URL path patterns (prefix match) to limit scraping. Can be specified multiple times.
     -   Example: `--match /docs/ --match /api/`
